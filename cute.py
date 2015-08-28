@@ -3,19 +3,38 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2 as cv
+from skimage import transform as tf
+
+
+def get_transform(bf,descr0, key0, descr1, key1):
+  if descr0 is None or descr1 is None or descr0.shape[1] != descr1.shape[1]:
+    None
+  matches = bf.knnMatch(descr0, descr1, k=2)
+  if len(matches) < 10 or len(matches[0]) != 2:
+    None
+  filter(lambda m: m[0].distance > 0.8 * m[1].distance, matches)
+  good_matches = [m1 for m1,m2 in matches]
+  if len(good_matches) < 5:
+    None
+  dst_pts = np.array([key0[m.queryIdx].pt for m in good_matches], dtype='float32')
+  src_pts = np.array([key1[m.trainIdx].pt for m in good_matches], dtype='float32')
+  return cv.findHomography(src_pts, dst_pts, cv.RANSAC)
 
 
 def main():
   kitty = cv.imread("kitty.png")
   pattern = cv.imread("pattern.png")
-
+  pattern_gray = cv.cvtColor(pattern, cv.COLOR_BGR2GRAY)
+  
   cap = cv.VideoCapture(1)
   print kitty.shape
   kitty_resized = cv.resize(kitty,(640,480))
+  
+  bf=cv.BFMatcher(cv.NORM_HAMMING)
   orb = cv.ORB()
-  keypoints, descriptors = orb.detectAndCompute(pattern, None)
+  keypoints, descriptors = orb.detectAndCompute(pattern_gray, None)
   pic = pattern
-  cv.drawKeypoints(pattern,keypoints,pic)
+  cv.drawKeypoints(pattern,keypoints,pic, color=(0,0,255))
   cv.imshow('pic',pic)
   while(True):
     # Capture frame-by-frame
@@ -23,18 +42,22 @@ def main():
     
     # Our operations on the frame come here
     gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-    graypic = gray
     #graypic = gray
-    orb = cv.ORB()
+    graypic = frame + 0
     cam_keypoints, cam_descriptors = orb.detectAndCompute(gray, None)
-    cv.drawKeypoints(gray,cam_keypoints,graypic)
-    print(graypic)
+    cv.drawKeypoints(frame,cam_keypoints,graypic, color=(0,0,255))
+    print cam_keypoints
+    
     cv.imshow('graypic',graypic)
-    #print gray.shape
-    # Display the resulting frame
-    cv.imshow('frame',gray)
-    half = (kitty_resized + frame)/2
-    cv.imshow('half', half)
+    
+    M, mask = get_transform(bf,descriptors, keypoints, cam_descriptors, cam_keypoints )
+    out = frame
+    if M is not None:
+      kitty_warped = tf.warp(kitty_resized,tf.ProjectiveTransform(M))
+      non_black_pixels = np.where(np.sum(kitty_warped, axis=2) > 0)
+      out[non_black_pixels[0], non_black_pixels[1], :] = 0
+      out = out + kitty_warped * 255
+    cv.imshow('half', out)
     if cv.waitKey(1) & 0xFF == ord('q'):
       break
 
