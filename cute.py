@@ -11,7 +11,7 @@ def main():
 
   cap = cv.VideoCapture(1)
   print kitty.shape
-  kitty = cv.resize(kitty,(640,480))
+  kitty_resized = cv.resize(kitty,(640,480))
   orb = cv.ORB()
   keypoints, descriptors = orb.detectAndCompute(pattern, None)
   pic = pattern
@@ -25,6 +25,7 @@ def main():
     gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
     graypic = gray
     #graypic = gray
+    orb = cv.ORB()
     cam_keypoints, cam_descriptors = orb.detectAndCompute(gray, None)
     cv.drawKeypoints(gray,cam_keypoints,graypic)
     print(graypic)
@@ -32,7 +33,7 @@ def main():
     #print gray.shape
     # Display the resulting frame
     cv.imshow('frame',gray)
-    half = (kitty + frame)/2
+    half = (kitty_resized + frame)/2
     cv.imshow('half', half)
     if cv.waitKey(1) & 0xFF == ord('q'):
       break
